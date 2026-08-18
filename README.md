@@ -1,1 +1,659 @@
-# inventaire_qrcode.html
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>📦 Inventaire QR Code – Pêche Électrique</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; color: #333; }
+
+    header {
+      background: linear-gradient(135deg, #1a6b3c, #2ecc71);
+      color: white; padding: 20px 30px;
+      display: flex; align-items: center; gap: 15px;
+    }
+    header h1 { font-size: 1.5em; }
+    header span { font-size: 2em; }
+
+    .tabs {
+      display: flex; background: #fff;
+      border-bottom: 2px solid #1a6b3c;
+      padding: 0 20px;
+    }
+    .tab-btn {
+      padding: 12px 25px; cursor: pointer;
+      border: none; background: none;
+      font-size: 0.95em; font-weight: 600;
+      color: #555; border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-btn.active { color: #1a6b3c; border-bottom-color: #1a6b3c; }
+    .tab-btn:hover { background: #f0f4f8; }
+
+    .tab-content { display: none; padding: 20px; }
+    .tab-content.active { display: block; }
+
+    /* === ONGLET LISTE === */
+    .search-bar {
+      display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .search-bar input, .search-bar select {
+      padding: 10px 14px; border: 1px solid #ccc;
+      border-radius: 8px; font-size: 0.9em; flex: 1; min-width: 150px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: white; border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 16px; cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border-left: 4px solid #ccc;
+    }
+    .card:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0,0,0,0.12); }
+    .card.etat-bon { border-left-color: #2ecc71; }
+    .card.etat-usage { border-left-color: #f39c12; }
+    .card.etat-hs { border-left-color: #e74c3c; }
+    .card.etat-controle { border-left-color: #3498db; }
+
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .card-code { font-weight: 700; font-size: 0.85em; color: #888; letter-spacing: 1px; }
+    .card-name { font-weight: 600; font-size: 1em; color: #222; margin-bottom: 6px; }
+    .badge {
+      display: inline-block; padding: 3px 10px;
+      border-radius: 20px; font-size: 0.75em; font-weight: 600;
+    }
+    .badge-bon { background: #d5f5e3; color: #1a6b3c; }
+    .badge-usage { background: #fdebd0; color: #b7770d; }
+    .badge-hs { background: #fadbd8; color: #c0392b; }
+    .badge-controle { background: #d6eaf8; color: #1a5276; }
+    .badge-nd { background: #eee; color: #666; }
+
+    .card-info { font-size: 0.8em; color: #777; margin-top: 6px; }
+    .card-qr { display: flex; justify-content: center; margin-top: 10px; }
+    .card-qr canvas, .card-qr img { width: 80px !important; height: 80px !important; }
+
+    /* === MODAL FICHE === */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55); z-index: 1000;
+      justify-content: center; align-items: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: white; border-radius: 16px;
+      width: 95%; max-width: 600px; max-height: 90vh;
+      overflow-y: auto; padding: 30px;
+      position: relative;
+    }
+    .modal-close {
+      position: absolute; top: 15px; right: 15px;
+      background: #eee; border: none; border-radius: 50%;
+      width: 32px; height: 32px; font-size: 1.1em;
+      cursor: pointer; font-weight: 700;
+    }
+    .modal-title { font-size: 1.4em; font-weight: 700; color: #1a6b3c; margin-bottom: 4px; }
+    .modal-code { font-size: 0.85em; color: #999; margin-bottom: 20px; }
+    .modal-qr { display: flex; justify-content: center; margin-bottom: 20px; }
+    .modal-qr canvas, .modal-qr img { width: 160px !important; height: 160px !important; }
+
+    .form-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+    }
+    @media (max-width: 500px) { .form-grid { grid-template-columns: 1fr; } }
+
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-group label { font-size: 0.8em; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-group input, .form-group select, .form-group textarea {
+      padding: 9px 12px; border: 1px solid #ddd;
+      border-radius: 8px; font-size: 0.9em; font-family: inherit;
+    }
+    .form-group textarea { resize: vertical; min-height: 70px; }
+
+    .btn-save {
+      width: 100%; margin-top: 20px; padding: 13px;
+      background: linear-gradient(135deg, #1a6b3c, #2ecc71);
+      color: white; border: none; border-radius: 10px;
+      font-size: 1em; font-weight: 600; cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn-save:hover { opacity: 0.9; }
+    .btn-print {
+      width: 100%; margin-top: 10px; padding: 11px;
+      background: #ecf0f1; color: #333; border: none;
+      border-radius: 10px; font-size: 0.9em; font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-print:hover { background: #dce1e5; }
+
+    .save-msg {
+      text-align: center; color: #1a6b3c;
+      font-weight: 600; margin-top: 10px;
+      display: none;
+    }
+
+    /* === ONGLET IMPRESSION === */
+    .print-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .print-card {
+      background: white; border: 1px solid #ddd;
+      border-radius: 10px; padding: 12px;
+      text-align: center;
+    }
+    .print-card .pcode { font-weight: 700; font-size: 0.8em; color: #555; }
+    .print-card .pname { font-size: 0.85em; margin: 4px 0; }
+    .print-card canvas, .print-card img { width: 100px !important; height: 100px !important; }
+
+    .btn-printall {
+      padding: 12px 24px; background: #1a6b3c; color: white;
+      border: none; border-radius: 8px; font-size: 0.95em;
+      font-weight: 600; cursor: pointer; margin-bottom: 20px;
+    }
+
+    /* === ONGLET FICHE SCANNÉE === */
+    #scan-result { padding: 20px; }
+    .fiche-view {
+      background: white; border-radius: 16px;
+      padding: 30px; max-width: 500px; margin: 0 auto;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    .fiche-header {
+      background: linear-gradient(135deg, #1a6b3c, #2ecc71);
+      color: white; border-radius: 10px;
+      padding: 16px; text-align: center; margin-bottom: 20px;
+    }
+    .fiche-row {
+      display: flex; justify-content: space-between;
+      padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+      font-size: 0.9em;
+    }
+    .fiche-row .label { color: #888; font-weight: 600; }
+    .fiche-row .value { font-weight: 600; color: #222; text-align: right; }
+
+    @media print {
+      header, .tabs, #tab-liste, #tab-fiche, .modal-overlay { display: none !important; }
+      #tab-impression { display: block !important; }
+      .btn-printall { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span>🎣</span>
+  <div>
+    <h1>Inventaire Matériel – Pêche Électrique</h1>
+    <small>Système de suivi par QR Code</small>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="showTab('liste')">📋 Inventaire</button>
+  <button class="tab-btn" onclick="showTab('impression')">🖨️ Impression QR</button>
+  <button class="tab-btn" onclick="showTab('fiche')">🔍 Fiche Scannée</button>
+</div>
+
+<!-- ===== ONGLET INVENTAIRE ===== -->
+<div id="tab-liste" class="tab-content active">
+  <div class="search-bar">
+    <input type="text" id="search" placeholder="🔍 Rechercher un équipement..." oninput="renderCards()"/>
+    <select id="filter-etat" onchange="renderCards()">
+      <option value="">Tous les états</option>
+      <option value="Bon état">✅ Bon état</option>
+      <option value="Usagé">⚠️ Usagé</option>
+      <option value="Hors service">❌ Hors service</option>
+      <option value="En contrôle">🔧 En contrôle</option>
+    </select>
+    <select id="filter-cat" onchange="renderCards()">
+      <option value="">Toutes catégories</option>
+    </select>
+  </div>
+  <div class="grid" id="cards-grid"></div>
+</div>
+
+<!-- ===== ONGLET IMPRESSION ===== -->
+<div id="tab-impression" class="tab-content">
+  <button class="btn-printall" onclick="window.print()">🖨️ Imprimer toutes les étiquettes</button>
+  <div class="print-grid" id="print-grid"></div>
+</div>
+
+<!-- ===== ONGLET FICHE SCANNÉE ===== -->
+<div id="tab-fiche" class="tab-content">
+  <div id="scan-result">
+    <div style="text-align:center; color:#999; padding:40px;">
+      <div style="font-size:3em;">📷</div>
+      <p style="margin-top:10px;">Cette page s'affiche automatiquement<br>quand vous scannez un QR code sur le terrain.</p>
+      <p style="margin-top:20px; font-size:0.85em;">Pour tester, ajoutez <code>?ref=BAL01</code> à l'URL</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL ÉDITION ===== -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div class="modal-title" id="modal-name"></div>
+    <div class="modal-code" id="modal-code"></div>
+    <div class="modal-qr" id="modal-qr"></div>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label>📅 Date d'achat</label>
+        <input type="date" id="f-achat"/>
+      </div>
+      <div class="form-group">
+        <label>🔌 Date mise en service</label>
+        <input type="date" id="f-service"/>
+      </div>
+      <div class="form-group">
+        <label>🔧 Dernier contrôle</label>
+        <input type="date" id="f-controle"/>
+      </div>
+      <div class="form-group">
+        <label>📆 Prochain contrôle</label>
+        <input type="date" id="f-prochaincontrole"/>
+      </div>
+      <div class="form-group">
+        <label>🏭 Fournisseur</label>
+        <input type="text" id="f-fournisseur" placeholder="Nom du fournisseur"/>
+      </div>
+      <div class="form-group">
+        <label>🔖 N° de série</label>
+        <input type="text" id="f-serie" placeholder="Numéro de série"/>
+      </div>
+      <div class="form-group">
+        <label>📍 Localisation</label>
+        <input type="text" id="f-localisation" placeholder="Ex : Entrepôt A, Véhicule 1..."/>
+      </div>
+      <div class="form-group">
+        <label>⚡ État</label>
+        <select id="f-etat">
+          <option value="">-- Sélectionner --</option>
+          <option value="Bon état">✅ Bon état</option>
+          <option value="Usagé">⚠️ Usagé</option>
+          <option value="Hors service">❌ Hors service</option>
+          <option value="En contrôle">🔧 En contrôle</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>💶 Prix d'achat (€)</label>
+        <input type="number" id="f-prix" placeholder="0.00" step="0.01"/>
+      </div>
+      <div class="form-group">
+        <label>👤 Responsable</label>
+        <input type="text" id="f-responsable" placeholder="Nom du responsable"/>
+      </div>
+      <div class="form-group full">
+        <label>📝 Observations / Remarques</label>
+        <textarea id="f-remarques" placeholder="Notes, historique de réparation..."></textarea>
+      </div>
+    </div>
+
+    <button class="btn-save" onclick="saveEquipement()">💾 Enregistrer</button>
+    <button class="btn-print" onclick="printFiche()">🖨️ Imprimer la fiche</button>
+    <div class="save-msg" id="save-msg">✅ Enregistré avec succès !</div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DONNÉES DE BASE
+// ============================================================
+const equipements = [
+  {code:"BAL01", nom:"Balance 1", categorie:"Biométrie"},
+  {code:"BAL02", nom:"Balance 2", categorie:"Biométrie"},
+  {code:"HER01", nom:"Héron 1", categorie:"Pêche électrique"},
+  {code:"HER02", nom:"Héron 2", categorie:"Pêche électrique"},
+  {code:"MART01", nom:"Martin pêcheur 1", categorie:"Pêche électrique"},
+  {code:"MART02", nom:"Martin pêcheur 2", categorie:"Pêche électrique"},
+  {code:"ANO01", nom:"Anode 1", categorie:"Pêche électrique"},
+  {code:"ANO02", nom:"Anode 2", categorie:"Pêche électrique"},
+  {code:"ANO03", nom:"Anode 3", categorie:"Pêche électrique"},
+  {code:"CAT01", nom:"Cathode 1", categorie:"Pêche électrique"},
+  {code:"CAT02", nom:"Cathode 2", categorie:"Pêche électrique"},
+  {code:"GBOB1", nom:"Grande Bobine 1", categorie:"Pêche électrique"},
+  {code:"GBOB2", nom:"Grande Bobine 2", categorie:"Pêche électrique"},
+  {code:"GBOB3", nom:"Grande Bobine 3", categorie:"Pêche électrique"},
+  {code:"GBOB4", nom:"Grande Bobine 4", categorie:"Pêche électrique"},
+  {code:"GBOB5", nom:"Grande Bobine 5", categorie:"Pêche électrique"},
+  {code:"GBOB6", nom:"Grande Bobine 6", categorie:"Pêche électrique"},
+  {code:"PBOB1", nom:"Petite Bobine 1", categorie:"Pêche électrique"},
+  {code:"PBOB2", nom:"Petite Bobine 2", categorie:"Pêche électrique"},
+  {code:"GEN01", nom:"Générateur", categorie:"Pêche électrique"},
+  {code:"TEL01", nom:"Télécommande Hertzienne 1", categorie:"Pêche électrique"},
+  {code:"TEL02", nom:"Télécommande Hertzienne 2", categorie:"Pêche électrique"},
+  {code:"TEL03", nom:"Télécommande Hertzienne 3", categorie:"Pêche électrique"},
+  {code:"TAL01", nom:"Talkie walkie 1", categorie:"Pêche électrique"},
+  {code:"TAL02", nom:"Talkie walkie 2", categorie:"Pêche électrique"},
+  {code:"TAL03", nom:"Talkie walkie 3", categorie:"Pêche électrique"},
+  {code:"GEP01", nom:"Grande épuisette 1", categorie:"Pêche électrique"},
+  {code:"GEP02", nom:"Grande épuisette 2", categorie:"Pêche électrique"},
+  {code:"GEP03", nom:"Grande épuisette 3", categorie:"Pêche électrique"},
+  {code:"GEP04", nom:"Grande épuisette 4", categorie:"Pêche électrique"},
+  {code:"GEP05", nom:"Grande épuisette 5", categorie:"Pêche électrique"},
+  {code:"PEP01", nom:"Petite épuisette 1", categorie:"Pêche électrique"},
+  {code:"PEP02", nom:"Petite épuisette 2", categorie:"Pêche électrique"},
+  {code:"PEP03", nom:"Petite épuisette 3", categorie:"Pêche électrique"},
+  {code:"FIL01", nom:"Filet de station 1", categorie:"Pêche électrique"},
+  {code:"FIL02", nom:"Filet de station 2", categorie:"Pêche électrique"},
+  {code:"FIL03", nom:"Filet de station 3", categorie:"Pêche électrique"},
+  {code:"PED01", nom:"Pédale Contacteur 1", categorie:"Pêche électrique"},
+  {code:"PDE02", nom:"Pédale Contacteur 2", categorie:"Pêche électrique"},
+];
+
+// ============================================================
+// STOCKAGE LOCAL
+// ============================================================
+function getData(code) {
+  return JSON.parse(localStorage.getItem('eq_' + code) || '{}');
+}
+function setData(code, data) {
+  localStorage.setItem('eq_' + code, JSON.stringify(data));
+}
+
+// ============================================================
+// BADGES & CLASSES
+// ============================================================
+function badgeEtat(etat) {
+  const map = {
+    "Bon état": ["badge-bon","✅"],
+    "Usagé": ["badge-usage","⚠️"],
+    "Hors service": ["badge-hs","❌"],
+    "En contrôle": ["badge-controle","🔧"],
+  };
+  const [cls, ico] = map[etat] || ["badge-nd","❓"];
+  return `<span class="badge ${cls}">${ico} ${etat || 'Non défini'}</span>`;
+}
+function cardClass(etat) {
+  return {"Bon état":"etat-bon","Usagé":"etat-usage","Hors service":"etat-hs","En contrôle":"etat-controle"}[etat]||"";
+}
+
+// ============================================================
+// RENDU DES CARTES
+// ============================================================
+function renderCards() {
+  const search = document.getElementById('search').value.toLowerCase();
+  const filterEtat = document.getElementById('filter-etat').value;
+  const filterCat = document.getElementById('filter-cat').value;
+  const grid = document.getElementById('cards-grid');
+  grid.innerHTML = '';
+
+  equipements.forEach(eq => {
+    const d = getData(eq.code);
+    if (search && !eq.nom.toLowerCase().includes(search) && !eq.code.toLowerCase().includes(search)) return;
+    if (filterEtat && d.etat !== filterEtat) return;
+    if (filterCat && eq.categorie !== filterCat) return;
+
+    const card = document.createElement('div');
+    card.className = `card ${cardClass(d.etat)}`;
+    card.innerHTML = `
+      <div class="card-header">
+        <div>
+          <div class="card-code">${eq.code}</div>
+          <div class="card-name">${eq.nom}</div>
+          ${badgeEtat(d.etat)}
+        </div>
+      </div>
+      <div class="card-info">
+        ${d.service ? `🔌 Mise en service : <strong>${formatDate(d.service)}</strong><br>` : ''}
+        ${d.controle ? `🔧 Dernier contrôle : <strong>${formatDate(d.controle)}</strong><br>` : ''}
+        ${d.fournisseur ? `🏭 ${d.fournisseur}<br>` : ''}
+        ${d.localisation ? `📍 ${d.localisation}` : ''}
+      </div>
+      <div class="card-qr" id="qr-card-${eq.code}"></div>
+    `;
+    card.addEventListener('click', () => openModal(eq.code));
+    grid.appendChild(card);
+
+    setTimeout(() => {
+      const el = document.getElementById(`qr-card-${eq.code}`);
+      if (el) {
+        el.innerHTML = '';
+        new QRCode(el, {
+          text: buildURL(eq.code),
+          width: 80, height: 80,
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      }
+    }, 50);
+  });
+}
+
+// ============================================================
+// FILTRE CATÉGORIES
+// ============================================================
+function buildCatFilter() {
+  const cats = [...new Set(equipements.map(e => e.categorie))];
+  const sel = document.getElementById('filter-cat');
+  cats.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    sel.appendChild(opt);
+  });
+}
+
+// ============================================================
+// URL DU QR CODE
+// ============================================================
+function buildURL(code) {
+  // L'URL pointe sur la même page avec le paramètre ?ref=CODE
+  return window.location.href.split('?')[0] + '?ref=' + code;
+}
+
+// ============================================================
+// MODAL
+// ============================================================
+let currentCode = '';
+
+function openModal(code) {
+  currentCode = code;
+  const eq = equipements.find(e => e.code === code);
+  const d = getData(code);
+
+  document.getElementById('modal-name').textContent = eq.nom;
+  document.getElementById('modal-code').textContent = `Code : ${code} • Catégorie : ${eq.categorie}`;
+
+  document.getElementById('f-achat').value = d.achat || '';
+  document.getElementById('f-service').value = d.service || '';
+  document.getElementById('f-controle').value = d.controle || '';
+  document.getElementById('f-prochaincontrole').value = d.prochaincontrole || '';
+  document.getElementById('f-fournisseur').value = d.fournisseur || '';
+  document.getElementById('f-serie').value = d.serie || '';
+  document.getElementById('f-localisation').value = d.localisation || '';
+  document.getElementById('f-etat').value = d.etat || '';
+  document.getElementById('f-prix').value = d.prix || '';
+  document.getElementById('f-responsable').value = d.responsable || '';
+  document.getElementById('f-remarques').value = d.remarques || '';
+  document.getElementById('save-msg').style.display = 'none';
+
+  const qrEl = document.getElementById('modal-qr');
+  qrEl.innerHTML = '';
+  new QRCode(qrEl, {
+    text: buildURL(code),
+    width: 160, height: 160,
+    correctLevel: QRCode.CorrectLevel.M
+  });
+
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  renderCards();
+}
+
+function saveEquipement() {
+  setData(currentCode, {
+    achat: document.getElementById('f-achat').value,
+    service: document.getElementById('f-service').value,
+    controle: document.getElementById('f-controle').value,
+    prochaincontrole: document.getElementById('f-prochaincontrole').value,
+    fournisseur: document.getElementById('f-fournisseur').value,
+    serie: document.getElementById('f-serie').value,
+    localisation: document.getElementById('f-localisation').value,
+    etat: document.getElementById('f-etat').value,
+    prix: document.getElementById('f-prix').value,
+    responsable: document.getElementById('f-responsable').value,
+    remarques: document.getElementById('f-remarques').value,
+  });
+  const msg = document.getElementById('save-msg');
+  msg.style.display = 'block';
+  setTimeout(() => msg.style.display = 'none', 2500);
+}
+
+function printFiche() {
+  const eq = equipements.find(e => e.code === currentCode);
+  const d = getData(currentCode);
+  const w = window.open('','_blank','width=600,height=700');
+  w.document.write(`
+    <html><head><title>Fiche ${currentCode}</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:30px;color:#333}
+      h2{color:#1a6b3c;border-bottom:2px solid #1a6b3c;padding-bottom:8px}
+      table{width:100%;border-collapse:collapse;margin-top:20px}
+      td{padding:10px;border-bottom:1px solid #eee;font-size:14px}
+      td:first-child{font-weight:bold;width:45%;color:#555}
+      .etat{display:inline-block;padding:4px 12px;border-radius:12px;background:#d5f5e3;color:#1a6b3c;font-weight:bold}
+    </style></head>
+    <body>
+      <h2>🎣 Fiche Équipement – ${eq.nom}</h2>
+      <p style="color:#888">Code : ${currentCode} | Catégorie : ${eq.categorie}</p>
+      <table>
+        <tr><td>État</td><td><span class="etat">${d.etat||'Non défini'}</span></td></tr>
+        <tr><td>Date d'achat</td><td>${formatDate(d.achat)||'—'}</td></tr>
+        <tr><td>Mise en service</td><td>${formatDate(d.service)||'—'}</td></tr>
+        <tr><td>Dernier contrôle</td><td>${formatDate(d.controle)||'—'}</td></tr>
+        <tr><td>Prochain contrôle</td><td>${formatDate(d.prochaincontrole)||'—'}</td></tr>
+        <tr><td>Fournisseur</td><td>${d.fournisseur||'—'}</td></tr>
+        <tr><td>N° de série</td><td>${d.serie||'—'}</td></tr>
+        <tr><td>Localisation</td><td>${d.localisation||'—'}</td></tr>
+        <tr><td>Prix d'achat</td><td>${d.prix ? d.prix+' €' : '—'}</td></tr>
+        <tr><td>Responsable</td><td>${d.responsable||'—'}</td></tr>
+        <tr><td>Observations</td><td>${d.remarques||'—'}</td></tr>
+      </table>
+      <p style="margin-top:30px;color:#aaa;font-size:12px">Généré le ${new Date().toLocaleDateString('fr-FR')}</p>
+    </body></html>
+  `);
+  w.document.close();
+  w.print();
+}
+
+// ============================================================
+// ONGLET IMPRESSION QR
+// ============================================================
+function renderPrintGrid() {
+  const grid = document.getElementById('print-grid');
+  equipements.forEach(eq => {
+    const div = document.createElement('div');
+    div.className = 'print-card';
+    div.innerHTML = `
+      <div class="pcode">${eq.code}</div>
+      <div class="pname">${eq.nom}</div>
+      <div id="qr-print-${eq.code}"></div>
+    `;
+    grid.appendChild(div);
+    setTimeout(() => {
+      new QRCode(document.getElementById(`qr-print-${eq.code}`), {
+        text: buildURL(eq.code),
+        width: 100, height: 100,
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }, 50);
+  });
+}
+
+// ============================================================
+// FICHE APRÈS SCAN (paramètre URL ?ref=CODE)
+// ============================================================
+function checkURLParam() {
+  const params = new URLSearchParams(window.location.search);
+  const ref = params.get('ref');
+  if (!ref) return;
+
+  const eq = equipements.find(e => e.code === ref);
+  if (!eq) {
+    document.getElementById('scan-result').innerHTML = `<p style="color:red;text-align:center">Équipement introuvable : ${ref}</p>`;
+    showTab('fiche');
+    return;
+  }
+
+  const d = getData(ref);
+  const etatColor = {"Bon état":"#2ecc71","Usagé":"#f39c12","Hors service":"#e74c3c","En contrôle":"#3498db"}[d.etat]||"#999";
+
+  document.getElementById('scan-result').innerHTML = `
+    <div class="fiche-view">
+      <div class="fiche-header">
+        <div style="font-size:1.5em;font-weight:700">${eq.nom}</div>
+        <div style="opacity:0.8;margin-top:4px">${eq.code} • ${eq.categorie}</div>
+        <div style="margin-top:10px;background:rgba(255,255,255,0.2);
+          display:inline-block;padding:5px 16px;border-radius:20px;
+          font-weight:700;color:${etatColor=="#2ecc71"?"white":"white"}">
+          ${d.etat ? '● ' + d.etat : '❓ État non défini'}
+        </div>
+      </div>
+      ${row("📅 Date d'achat", formatDate(d.achat))}
+      ${row("🔌 Mise en service", formatDate(d.service))}
+      ${row("🔧 Dernier contrôle", formatDate(d.controle))}
+      ${row("📆 Prochain contrôle", formatDate(d.prochaincontrole))}
+      ${row("🏭 Fournisseur", d.fournisseur)}
+      ${row("🔖 N° de série", d.serie)}
+      ${row("📍 Localisation", d.localisation)}
+      ${row("💶 Prix d'achat", d.prix ? d.prix+' €' : null)}
+      ${row("👤 Responsable", d.responsable)}
+      ${d.remarques ? `<div style="margin-top:16px;padding:12px;background:#f9f9f9;border-radius:8px;font-size:0.85em;color:#555">
+        <strong>📝 Observations :</strong><br>${d.remarques}</div>` : ''}
+      <div style="margin-top:20px;text-align:center;font-size:0.75em;color:#aaa">
+        Scanné le ${new Date().toLocaleDateString('fr-FR')}
+      </div>
+    </div>
+  `;
+  showTab('fiche');
+}
+
+function row(label, value) {
+  if (!value) return '';
+  return `<div class="fiche-row"><span class="label">${label}</span><span class="value">${value}</span></div>`;
+}
+
+// ============================================================
+// UTILITAIRES
+// ============================================================
+function formatDate(d) {
+  if (!d) return null;
+  const parts = d.split('-');
+  if (parts.length !== 3) return d;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    if (b.getAttribute('onclick').includes("'"+name+"'")) b.classList.add('active');
+  });
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('load', () => {
+  buildCatFilter();
+  renderCards();
+  renderPrintGrid();
+  checkURLParam();
+});
+</script>
+</body>
+</html>

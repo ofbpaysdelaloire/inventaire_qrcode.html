@@ -306,7 +306,39 @@
   </div>
 </div>
 
+<!-- ============================================================ -->
+<!-- SCRIPTS FIREBASE FIRESTORE -->
+<!-- ============================================================ -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
 <script>
+// Initialisation de Firebase avec tes clés
+const firebaseConfig = {
+  apiKey: "AIzaSyCaIlP3SxkxGBoJ1uykFLlcCdot2zA_L-Q",
+  authDomain: "inventaire-qrcode.firebaseapp.com",
+  projectId: "inventaire-qrcode",
+  storageBucket: "inventaire-qrcode.firebasestorage.app",
+  messagingSenderId: "625621344249",
+  appId: "1:625621344249:web:1d94f4141237ec64ce2728"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Variable globale pour mettre en cache les données Firestore
+let firestoreCache = {};
+
+// Écouteur en temps réel sur la base de données Firestore
+db.collection("inventaire").onSnapshot((snapshot) => {
+  firestoreCache = {};
+  snapshot.forEach((doc) => {
+    firestoreCache[doc.id] = doc.data();
+  });
+  renderCards();
+  checkURLParam();
+});
+
 // ============================================================
 // DONNÉES DE BASE
 // ============================================================
@@ -353,13 +385,20 @@ const equipements = [
 ];
 
 // ============================================================
-// STOCKAGE LOCAL
+// STOCKAGE FIRESTORE
 // ============================================================
 function getData(code) {
-  return JSON.parse(localStorage.getItem('eq_' + code) || '{}');
+  return firestoreCache[code] || {};
 }
+
 function setData(code, data) {
-  localStorage.setItem('eq_' + code, JSON.stringify(data));
+  db.collection("inventaire").doc(code).set(data)
+    .then(() => {
+      console.log("Enregistré sur Firestore !");
+    })
+    .catch((error) => {
+      console.error("Erreur lors de la sauvegarde Firestore : ", error);
+    });
 }
 
 // ============================================================
@@ -383,7 +422,10 @@ function cardClass(etat) {
 // RENDU DES CARTES
 // ============================================================
 function renderCards() {
-  const search = document.getElementById('search').value.toLowerCase();
+  const searchInput = document.getElementById('search');
+  if (!searchInput) return;
+
+  const search = searchInput.value.toLowerCase();
   const filterEtat = document.getElementById('filter-etat').value;
   const filterCat = document.getElementById('filter-cat').value;
   const grid = document.getElementById('cards-grid');
@@ -447,7 +489,6 @@ function buildCatFilter() {
 // URL DU QR CODE
 // ============================================================
 function buildURL(code) {
-  // L'URL pointe sur la même page avec le paramètre ?ref=CODE
   return window.location.href.split('?')[0] + '?ref=' + code;
 }
 
@@ -554,6 +595,7 @@ function printFiche() {
 // ============================================================
 function renderPrintGrid() {
   const grid = document.getElementById('print-grid');
+  grid.innerHTML = '';
   equipements.forEach(eq => {
     const div = document.createElement('div');
     div.className = 'print-card';
@@ -598,7 +640,7 @@ function checkURLParam() {
         <div style="opacity:0.8;margin-top:4px">${eq.code} • ${eq.categorie}</div>
         <div style="margin-top:10px;background:rgba(255,255,255,0.2);
           display:inline-block;padding:5px 16px;border-radius:20px;
-          font-weight:700;color:${etatColor=="#2ecc71"?"white":"white"}">
+          font-weight:700;color:white">
           ${d.etat ? '● ' + d.etat : '❓ État non défini'}
         </div>
       </div>
@@ -650,38 +692,8 @@ function showTab(name) {
 // ============================================================
 window.addEventListener('load', () => {
   buildCatFilter();
-  renderCards();
   renderPrintGrid();
-  checkURLParam();
 });
-</script>
-<script type="module">
-  // Importation des fonctions nécessaires depuis Firebase
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDoc, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-  // Configuration de ton projet Firebase
-  const firebaseConfig = {
-    apiKey: "AIzaSyCaIlP3SxkxGBoJ1uykFLlcCdot2zA_L-Q",
-    authDomain: "inventaire-qrcode.firebaseapp.com",
-    projectId: "inventaire-qrcode",
-    storageBucket: "inventaire-qrcode.firebasestorage.app",
-    messagingSenderId: "625621344249",
-    appId: "1:625621344249:web:1d94f4141237ec64ce2728"
-  };
-
-  // Initialisation de Firebase et Firestore
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-
-  // Exposer les fonctions globalement pour pouvoir les utiliser dans tes boutons
-  window.db = db;
-  window.doc = doc;
-  window.setDoc = setDoc;
-  window.getDoc = getDoc;
-  window.collection = collection;
-
-  console.log("Firebase connecté avec succès !");
 </script>
 </body>
 </html>

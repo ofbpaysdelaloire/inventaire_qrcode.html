@@ -655,5 +655,33 @@ window.addEventListener('load', () => {
   checkURLParam();
 });
 </script>
+<script type="module">
+  // Importation des fonctions nécessaires depuis Firebase
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc, collection } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+  // Configuration de ton projet Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyCaIlP3SxkxGBoJ1uykFLlcCdot2zA_L-Q",
+    authDomain: "inventaire-qrcode.firebaseapp.com",
+    projectId: "inventaire-qrcode",
+    storageBucket: "inventaire-qrcode.firebasestorage.app",
+    messagingSenderId: "625621344249",
+    appId: "1:625621344249:web:1d94f4141237ec64ce2728"
+  };
+
+  // Initialisation de Firebase et Firestore
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // Exposer les fonctions globalement pour pouvoir les utiliser dans tes boutons
+  window.db = db;
+  window.doc = doc;
+  window.setDoc = setDoc;
+  window.getDoc = getDoc;
+  window.collection = collection;
+
+  console.log("Firebase connecté avec succès !");
+</script>
 </body>
 </html>
